@@ -9,12 +9,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-      - key: DB_DIR
-        value: /data
-    disk:
-      name: sqlite-data
-      mountPath: /data
-      sizeGB: 1
 
   # ─── Frontend (React + Vite) ──────────────────────────────────────────
   - type: web
