@@ -3,19 +3,17 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import declarative_base
 import os
 
-# Read the DATABASE_URL from the environment (set by Render or a .env file)
-# Falls back to SQLite for local development if not set
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./onetrip.db"  # local fallback only
+# On Render, the persistent disk is mounted at /data
+# Locally it falls back to a ./database folder
+DB_DIRECTORY = os.getenv("DB_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'database')))
+os.makedirs(DB_DIRECTORY, exist_ok=True)
+
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(DB_DIRECTORY, 'onetrip.db')}"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False}
 )
 
-# Render's Postgres URLs start with "postgres://" but SQLAlchemy needs "postgresql://"
-if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
-    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
