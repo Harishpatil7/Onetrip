@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE from '../api';
 import { LayoutDashboard, Users, FileText, Settings, Clock, CheckCircle, LogOut } from 'lucide-react';
 import '../index.css';
 
@@ -24,7 +25,7 @@ export default function DashboardLayout() {
     const fetchAppts = async () => {
         try {
             // Connect to our SQLite FastAPI backend to fetch real data
-            const res = await axios.get('http://localhost:8000/api/dashboard/appointments');
+            const res = await axios.get(`${API_BASE}/api/dashboard/appointments`);
             setAppointments(res.data);
         } catch (e) {
             console.error(e);
@@ -37,7 +38,7 @@ export default function DashboardLayout() {
 
     const markCompleted = async (id) => {
         try {
-            await axios.put(`http://localhost:8000/api/dashboard/appointments/${id}/complete`);
+            await axios.put(`${API_BASE}/api/dashboard/appointments/${id}/complete`);
             fetchAppts(); // Refresh data correctly
         } catch (e) {
             console.error(e);

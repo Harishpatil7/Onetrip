@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE from '../api';
 
 export default function Login() {
     const [username, setUsername] = useState('admin');
@@ -16,7 +17,7 @@ export default function Login() {
 
         try {
             // Connect to the isolated staff DB logic in FastAPI
-            const res = await axios.post('http://localhost:8000/api/staff/login', { username, password });
+            const res = await axios.post(`${API_BASE}/api/staff/login`, { username, password });
             if (res.data.success) {
                 localStorage.setItem('staffToken', res.data.token);
                 localStorage.setItem('staffUser', JSON.stringify(res.data.user));
