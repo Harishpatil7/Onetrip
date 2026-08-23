@@ -1,7 +1,18 @@
-from sqlalchemy.orm import Session
+﻿from sqlalchemy.orm import Session
 import models
 import random
 import string
+
+def generate_unique_token(db: Session, length: int = 5, digits_only: bool = False) -> str:
+    chars = string.digits if digits_only else (string.ascii_uppercase + string.digits)
+    for _ in range(100):
+        token = "".join(random.choices(chars, k=length))
+        token_number = f"T-{token}"
+        exists = db.query(models.Appointment).filter(models.Appointment.token_number == token_number).first()
+        if not exists:
+            return token
+    return "".join(random.choices(chars, k=length + 2))
+
 
 # =========================================================================
 # BOT TEXT LOGIC 
@@ -70,7 +81,7 @@ def process_incoming_message(db: Session, phone_number: str, message_body: str):
     elif state == "CHECKING_DOCS":
         if msg_upper == "YES" or msg_upper == "Y":
             service = db.query(models.Service).filter(models.Service.id == citizen.selected_service_id).first()
-            token = "".join(random.choices(string.ascii_uppercase + string.digits, k=5))
+            token = generate_unique_token(db, length=5)
             db.add(models.Appointment(citizen_id=citizen.id, service_id=service.id, token_number=f"T-{token}"))
             citizen.bot_state = "START"
             citizen.selected_service_id = None
@@ -198,7 +209,7 @@ def process_incoming_voice(db: Session, phone_number: str, pressed_digit: str, s
     elif state == "CHECKING_DOCS":
         if pressed_digit == "1":
             service = db.query(models.Service).filter(models.Service.id == citizen.selected_service_id).first()
-            token = "".join(random.choices(string.digits, k=4))
+            token = generate_unique_token(db, length=4, digits_only=True)
             
             db.add(models.Appointment(citizen_id=citizen.id, service_id=service.id, token_number=f"T-{token}"))
             citizen.bot_state = "SELECT_LANGUAGE"

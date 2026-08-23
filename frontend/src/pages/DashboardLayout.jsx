@@ -7,41 +7,99 @@ import '../index.css';
 
 export default function DashboardLayout() {
     const [appointments, setAppointments] = useState([]);
+    const [citizens, setCitizens] = useState([]);
+    const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [citizensLoading, setCitizensLoading] = useState(false);
+    const [servicesLoading, setServicesLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard'); // Handle switching views
     const navigate = useNavigate();
 
     const user = JSON.parse(localStorage.getItem('staffUser') || '{}');
 
-    // Verify login on mount
+    // Verify login on mount and tab switch
     useEffect(() => {
         if (!localStorage.getItem('staffToken')) {
             navigate('/login');
         } else {
-            fetchAppts();
+            if (activeTab === 'dashboard') {
+                fetchAppts();
+            } else if (activeTab === 'citizens') {
+                fetchCitizens();
+            } else if (activeTab === 'services') {
+                fetchServices();
+            }
         }
-    }, [navigate]);
+    }, [navigate, activeTab]);
 
     const fetchAppts = async () => {
         try {
-            // Connect to our SQLite FastAPI backend to fetch real data
-            const res = await axios.get(`${API_BASE}/api/dashboard/appointments`);
+            const token = localStorage.getItem('staffToken');
+            const res = await axios.get(`${API_BASE}/api/dashboard/appointments`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setAppointments(res.data);
         } catch (e) {
             console.error(e);
-            // In case we haven't created data yet or server is off, fallback:
+            if (e.response && e.response.status === 401) {
+                handleLogout();
+            }
             setAppointments([]);
         } finally {
             setLoading(false);
         }
     };
 
+    const fetchCitizens = async () => {
+        setCitizensLoading(true);
+        try {
+            const token = localStorage.getItem('staffToken');
+            const res = await axios.get(`${API_BASE}/api/dashboard/citizens`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setCitizens(res.data);
+        } catch (e) {
+            console.error(e);
+            if (e.response && e.response.status === 401) {
+                handleLogout();
+            }
+            setCitizens([]);
+        } finally {
+            setCitizensLoading(false);
+        }
+    };
+
+    const fetchServices = async () => {
+        setServicesLoading(true);
+        try {
+            const token = localStorage.getItem('staffToken');
+            const res = await axios.get(`${API_BASE}/api/dashboard/services`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setServices(res.data);
+        } catch (e) {
+            console.error(e);
+            if (e.response && e.response.status === 401) {
+                handleLogout();
+            }
+            setServices([]);
+        } finally {
+            setServicesLoading(false);
+        }
+    };
+
     const markCompleted = async (id) => {
         try {
-            await axios.put(`${API_BASE}/api/dashboard/appointments/${id}/complete`);
+            const token = localStorage.getItem('staffToken');
+            await axios.put(`${API_BASE}/api/dashboard/appointments/${id}/complete`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             fetchAppts(); // Refresh data correctly
         } catch (e) {
             console.error(e);
+            if (e.response && e.response.status === 401) {
+                handleLogout();
+            }
         }
     };
 
@@ -110,9 +168,19 @@ export default function DashboardLayout() {
                         <p style={{ color: 'var(--text-muted)' }}>Secure authentication confirmed.</p>
                     </div>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 500 }}>{user.office || 'Govt Office #04'} | {user.username}</span>
-                        <div style={{ width: '40px', height: '40px', backgroundColor: '#E5E7EB', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                            STAFF
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 600 }}>{user.username}</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{user.role} | {user.office || 'Govt Office'}</span>
+                        </div>
+                        <div style={{ 
+                            padding: '6px 12px', 
+                            backgroundColor: user.role === 'Viewer' ? '#FEF3C7' : user.role === 'Officer' ? '#DBEAFE' : '#D1FAE5', 
+                            color: user.role === 'Viewer' ? '#D97706' : user.role === 'Officer' ? '#2563EB' : '#059669', 
+                            borderRadius: '20px', 
+                            fontSize: '12px', 
+                            fontWeight: 700 
+                        }}>
+                            {user.role?.toUpperCase() || 'STAFF'}
                         </div>
                     </div>
                 </div>
@@ -198,12 +266,18 @@ export default function DashboardLayout() {
                                             </td>
                                             <td>
                                                 {app.status === 'PENDING' ? (
-                                                    <button
-                                                        className="action-btn"
-                                                        onClick={() => markCompleted(app.id)}
-                                                    >
-                                                        Verify & Complete
-                                                    </button>
+                                                    user.role === 'Viewer' ? (
+                                                        <button className="action-btn" style={{ opacity: 0.5, cursor: 'not-allowed', backgroundColor: '#E5E7EB', color: '#9CA3AF' }} disabled title="Viewers cannot resolve tokens">
+                                                            Read-Only
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            className="action-btn"
+                                                            onClick={() => markCompleted(app.id)}
+                                                        >
+                                                            Verify & Complete
+                                                        </button>
+                                                    )
                                                 ) : (
                                                     <button className="action-btn" disabled>
                                                         Resolved ✓
@@ -218,27 +292,112 @@ export default function DashboardLayout() {
                     </>
                 )}
 
-                {/* MOCK Citizens Page */}
+                {/* Citizens Page */}
                 {activeTab === 'citizens' && (
-                    <div className="table-card" style={{ padding: '24px' }}>
-                        <h2>Citizens Database Directory</h2>
-                        <p style={{ color: 'var(--text-muted)' }}>The government securely stores registered citizens.</p>
-                        <br />
-                        <div style={{ padding: '20px', border: '1px solid var(--border)', borderRadius: '8px', backgroundColor: '#F9FAFB' }}>
-                            <p><strong>System Message:</strong> 4 Citizens currently registered in the database memory.</p>
+                    <div className="table-card">
+                        <div className="table-header">
+                            <div>
+                                <h2>Citizens Database Directory</h2>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Secure storage of all citizens registered in bot system.</p>
+                            </div>
+                            <button onClick={fetchCitizens} className="action-btn" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'white', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
+                                Refresh Citizens
+                            </button>
                         </div>
+
+                        {citizensLoading ? (
+                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading citizens list...</div>
+                        ) : (
+                            <table style={{ width: '100%' }}>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Phone Number</th>
+                                        <th>Location</th>
+                                        <th>Bot State</th>
+                                        <th>Language</th>
+                                        <th>Selected Service</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {citizens.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                                                No citizens registered in the database yet.
+                                            </td>
+                                        </tr>
+                                    ) : citizens.map((citizen) => (
+                                        <tr key={citizen.id}>
+                                            <td style={{ fontWeight: 600 }}>{citizen.name || "N/A"}</td>
+                                            <td>{citizen.phone_number}</td>
+                                            <td style={{ color: 'var(--text-muted)' }}>{citizen.location || "N/A"}</td>
+                                            <td>
+                                                <span style={{ backgroundColor: '#F3F4F6', color: '#374151', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 500, fontFamily: 'monospace' }}>
+                                                    {citizen.bot_state}
+                                                </span>
+                                            </td>
+                                            <td style={{ fontWeight: 500 }}>
+                                                {citizen.language === 'KN' ? 'ಕನ್ನಡ (KN)' : citizen.language === 'EN' ? 'English (EN)' : citizen.language}
+                                            </td>
+                                            <td style={{ fontWeight: 500, color: citizen.service !== 'None' ? 'var(--primary)' : 'var(--text-muted)' }}>
+                                                {citizen.service}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 )}
 
-                {/* MOCK Services Repo */}
+                {/* Services Page */}
                 {activeTab === 'services' && (
-                    <div className="table-card" style={{ padding: '24px' }}>
-                        <h2>Active Government Services</h2>
-                        <p style={{ color: 'var(--text-muted)' }}>Currently supported by OneTrip algorithm.</p>
-                        <ul style={{ padding: '20px' }}>
-                            <li><strong>Income Certificate</strong> (ಆದಾಯ ಪ್ರಮಾಣಪತ್ರ)</li>
-                            <li><strong>Ration Card</strong> (ಪಡಿತರ ಚೀಟಿ)</li>
-                        </ul>
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h2 style={{ fontSize: '18px', fontWeight: 600 }}>Active Government Services Repo</h2>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Service parameters and document requirements currently configured in the database.</p>
+                            </div>
+                            <button onClick={fetchServices} className="action-btn" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'white', color: 'var(--text-main)', border: '1px solid var(--border)' }}>
+                                Refresh Services
+                            </button>
+                        </div>
+
+                        {servicesLoading ? (
+                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading services list...</div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
+                                {services.length === 0 ? (
+                                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)', backgroundColor: 'white', border: '1px solid var(--border)', borderRadius: '12px' }}>
+                                        No services registered in the database.
+                                    </div>
+                                ) : services.map((svc) => (
+                                    <div key={svc.id} style={{ backgroundColor: 'white', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                        <div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-main)' }}>{svc.name_en}</h3>
+                                                <span style={{ fontSize: '12px', backgroundColor: '#EEF2FF', color: 'var(--primary)', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>ID: {svc.id}</span>
+                                            </div>
+                                            <h4 style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-muted)', marginTop: '4px' }}>{svc.name_kn}</h4>
+                                        </div>
+
+                                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                                            <h5 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>English Requirements</h5>
+                                            <pre style={{ fontFamily: 'inherit', fontSize: '14px', color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>
+                                                {svc.required_docs_en}
+                                            </pre>
+                                        </div>
+
+                                        <div style={{ borderTop: '1px dashed var(--border)', paddingTop: '16px' }}>
+                                            <h5 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>ಕನ್ನಡ ದಾಖಲೆಗಳು (Kannada Requirements)</h5>
+                                            <pre style={{ fontFamily: 'inherit', fontSize: '14px', color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>
+                                                {svc.required_docs_kn}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </main>
