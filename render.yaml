@@ -6,9 +6,23 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    disk:
+      name: onetrip-db-disk
+      mountPath: /data
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: DB_DIR
+        value: /data
+      - key: ALLOW_SEED
+        value: "true"
+      - key: SEED_ADMIN_PASSWORD
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://onetrip-frontend.onrender.com,http://localhost:5173,http://localhost:3000
 
   # ─── Frontend (React + Vite) ──────────────────────────────────────────
   - type: web
@@ -17,6 +31,9 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://onetrip-backend.onrender.com
     routes:
       - type: rewrite
         source: /*
